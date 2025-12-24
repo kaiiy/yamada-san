@@ -1,0 +1,24 @@
+{
+  "name": "web-watch",
+  "scripts": {
+    "build": "rm -rf dist && yarn ts-node ./bin/build.ts",
+    "execute": "yarn build && node --env-file=.env ./dist/index.js"
+  },
+  "packageManager": "yarn@4.9.4",
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.159",
+    "@types/node": "^24.10.4",
+    "console-log-colors": "^0.5.0",
+    "esbuild": "^0.27.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "volta": {
+    "node": "24.12.0",
+    "yarn": "4.12.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sns": "^3.958.0",
+    "rss-parser": "^3.13.0"
+  }
+}

@@ -1,0 +1,30 @@
+version: 3
+
+silent: true
+
+vars:
+  FUNCTION_NAME: "yamada-san"
+
+tasks:
+  _zip:
+    dir: dist/
+    cmds:
+      - zip index.zip index.js > /dev/null
+  build:
+    cmds:
+      - mkdir -p dist/
+      - yarn build
+      - task _zip
+      - du -sh ./dist/index.zip
+  upload:
+    dir: dist/
+    vars:
+      LOG_NAME:
+        sh: date -Iseconds | sed 's/\s/\_/' | sed 's/+/\_/' | sed 's/\:/-/g'
+    cmds:
+      - mkdir -p ../log/
+      - "aws lambda update-function-code --function-name {{ .FUNCTION_NAME }} --zip-file fileb://index.zip > ../log/{{ .LOG_NAME }}.json"
+  deploy:
+    cmds:
+      - task build
+      - task upload

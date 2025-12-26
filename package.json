@@ -19,6 +19,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-sns": "^3.958.0",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "https://github.com/kaiiy/rss-parser.git#commit=70e57bc12e6863d22f4ed5f3d1c2457f16a99c72"
   }
 }

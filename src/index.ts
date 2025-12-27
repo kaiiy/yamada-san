@@ -6,18 +6,16 @@ const RSS_URL = "https://mgpk-cdn.magazinepocket.com/static/rss/2620/feed.xml";
 const DEFAULT_REGION = "ap-northeast-1";
 
 type Config = {
-	key: string;
 	topicArn: string;
 	region: string;
 };
 
 const getConfigFromEnv = (): Config => {
-	const { KEY, TOPIC_ARN, AWS_REGION } = process.env;
-	if (!KEY || !TOPIC_ARN) {
-		throw new Error("Missing environment variables: KEY or TOPIC_ARN");
+	const { TOPIC_ARN, AWS_REGION } = process.env;
+	if (!TOPIC_ARN) {
+		throw new Error("Missing environment variables: TOPIC_ARN");
 	}
 	return {
-		key: KEY,
 		topicArn: TOPIC_ARN,
 		region: AWS_REGION ?? DEFAULT_REGION,
 	};

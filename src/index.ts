@@ -42,68 +42,106 @@ const sendMessage = async (client: SNSClient, topicArn: string, subject: string,
 };
 
 const formatJstDateTime = (date: Date) => {
-	const yyyy = new Intl.DateTimeFormat("ja-JP", {
+	const dtf = new Intl.DateTimeFormat("ja-JP", {
 		timeZone: "Asia/Tokyo",
 		year: "numeric",
-	}).format(date);
-	const mm = new Intl.DateTimeFormat("ja-JP", {
-		timeZone: "Asia/Tokyo",
 		month: "2-digit",
-	}).format(date);
-	const dd = new Intl.DateTimeFormat("ja-JP", {
-		timeZone: "Asia/Tokyo",
 		day: "2-digit",
-	}).format(date);
-	const hh = new Intl.DateTimeFormat("ja-JP", {
-		timeZone: "Asia/Tokyo",
 		hour: "2-digit",
-		hour12: false,
-	}).format(date);
-	const min = new Intl.DateTimeFormat("ja-JP", {
-		timeZone: "Asia/Tokyo",
 		minute: "2-digit",
-	}).format(date);
+		hour12: false,
+	});
+
+	const parts = dtf.formatToParts(date).reduce((acc, p) => {
+		if (p.type !== "literal") acc[p.type] = p.value;
+		return acc;
+	}, {} as Record<string, string>);
+
+	const yyyy = parts.year;
+	const mm = parts.month;
+	const dd = parts.day;
+	const hh = (parts.hour ?? "").padStart(2, "0");
+	const min = (parts.minute ?? "").padStart(2, "0");
 
 	return `${yyyy}/${mm}/${dd} ${hh}:${min} (JST)`;
 };
 
-const buildMessage = (title: string, pubDate: Date) => {
+const buildMessage = (title: string, pubDate: Date, url: string) => {
 	return [
 		`『みいちゃんと山田さん』が公開されました！`,
 		"",
 		"詳細情報",
 		`- タイトル: ${title}`,
 		`- 配信日: ${formatJstDateTime(pubDate)}`,
-		`- URL: https://pocket.shonenmagazine.com/title/02620/episode/402265`
+		`- URL: ${url}`
 	].join("\n");
 };
 
-// Lambda handler
+type RssItem = Parser.Item;
+
+const getCutoffDate = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000);
+
+const requirePubDate = (item: RssItem, label: string): Date | null => {
+	if (!item.pubDate) {
+		console.log(`No pubDate found in the ${label} item.`);
+		return null;
+	}
+	const d = new Date(item.pubDate);
+	if (Number.isNaN(d.getTime())) {
+		console.log(`Invalid pubDate found in the ${label} item:`, item.pubDate);
+		return null;
+	}
+	return d;
+};
+
+const getItemDisplay = (item: RssItem) => ({
+	title: item.title || "タイトルなし",
+	url: item.link || "URLなし",
+});
+
+const fetchFeedItems = async () => {
+	const parser = new Parser();
+	const feed = await parser.parseURL(RSS_URL);
+	return feed.items ?? [];
+};
+
 export const handler = async (
 	event: EventBridgeEvent<"Scheduled Event", ScheduledEvent>,
 	_: Context,
 ): Promise<void> => {
+	console.log("Scheduled event received:", { id: event.id, time: event.time });
+
 	const cfg = getConfigFromEnv();
 	const sns = createSnsClient(cfg.region);
-	const parser = new Parser();
-	const feed = await parser.parseURL(RSS_URL);
 
-	const items = feed.items;
-	const yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
-
-	for (const item of items) {
-		if (!item.pubDate) {
-			continue;
-		}
-		const pubDate = new Date(item.pubDate);
-		if (Number.isNaN(pubDate.getTime())) {
-			continue;
-		}
-
-		if (pubDate > yesterday) {
-			const msg = buildMessage(item.title || "タイトルなし", pubDate);
-			await sendMessage(sns, cfg.topicArn, `配信予定: 『みいちゃんと山田さん』`, msg);
-		}
+	const items = await fetchFeedItems();
+	if (items.length === 0) {
+		console.log("No items found in the RSS feed.");
+		return;
 	}
+
+	const latestItem = items[0];
+	const latestPubDate = requirePubDate(latestItem, "latest");
+	if (!latestPubDate) return;
+
+	const cutoff = getCutoffDate(24);
+	if (latestPubDate <= cutoff) {
+		console.log("No new items published since cutoff.", { cutoff: cutoff.toISOString() });
+		return;
+	}
+
+	if (items.length < 2) {
+		console.log("Only one item exists; nothing to notify (needs second latest item).");
+		return;
+	}
+
+	const secondLatestItem = items[1];
+	const secondLatestPubDate = requirePubDate(secondLatestItem, "second latest");
+	if (!secondLatestPubDate) return;
+
+	const { title, url } = getItemDisplay(secondLatestItem);
+	const msg = buildMessage(title, secondLatestPubDate, url);
+
+	await sendMessage(sns, cfg.topicArn, `配信予定: 『みいちゃんと山田さん』`, msg);
 };
 

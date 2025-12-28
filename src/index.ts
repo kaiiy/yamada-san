@@ -74,6 +74,7 @@ const buildMessage = (title: string, pubDate: Date) => {
 		"詳細情報",
 		`- タイトル: ${title}`,
 		`- 配信日: ${formatJstDateTime(pubDate)}`,
+		`- URL: https://pocket.shonenmagazine.com/title/02620/episode/402265`
 	].join("\n");
 };
 
